@@ -1,0 +1,380 @@
+---
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+![](https://bookface-images.s3.amazonaws.com/logos/d69e3b90f5cd0c8528283d84e3b6e87097c94302.png)
+
+## **Introduction**
+
+<br>
+
+#### **Background**
+Bellabeat is the go-to wellness brand company for women with an ecosystem of products and services focused on women’s health. Since it was founded in 2013, Bellabeat has grown rapidly and quickly positioned itself as a tech-driven wellness company for women. However, Co-founder and CCO, Urska Srsen would like to leverage available market data to grow the company into an even larger competitor in the tech-wellness industry.
+
+<br>
+
+#### **Main Problems**
+
+How do users use fitness devices and how can this help Bellabeat's marketing strategy?
+
+<br>
+
+#### **Objective**
+
+The task of this analysis is to gain insight into how consumers use non-Bellabeat smart devices, then apply these insights to one of Bellabeat product to inform recommendations for Bellabeat's marketing strategy.
+
+<br>
+
+## **About the Data**
+
+<br>
+
+#### **Data used and credibility**
+
+The data provided was the FitBit Tracker Data. It is licensed by CC0: Public Domain and can be found on Kaggle, which shows that the data is reputable and can be accessed by the public. The folder consists of 18 csv files, 15 in long format and 3 in wide. The datasets contain data from 30 Fitbit users over a period of 1 month, personally tracking things such as their daily steps, amount of sleep, active minutes, and so on.
+
+<br>
+
+#### **Problem with data**
+
+* There are no genders revealed in this dataset, which is crucial as Bellabeat is a women's focused company. Other key pieces of information missing include the users' ages, the region where the data was collected, and things such as the weather.
+
+* The sample size is small with only 30 people and the time period of data collection is too short as 1 month is too brief to make any long-term conclusions.
+
+<br>
+
+## **Process the Data**
+
+```{r Import Libraries}
+#Import Libraries
+
+library(tidyverse) 
+library(skimr) #easily summarize data
+library(dplyr) #filtering
+library(tidyr) #data cleaning
+library(janitor) #data cleaning
+library(readr) #read csv files
+library(lubridate) #date format
+library(ggplot2) #data visualization
+library(gghighlight) #data highlighting
+```
+
+
+
+```{r Import Datasets}
+# Import Datasets
+
+activity <- read.csv("D:/Data Analyst/Data Analyst Software/Rstudio_Directory/Dataset/Fitabase Data 4.12.16-5.12.16/dailyActivity_merged.csv")
+calories <- read.csv("D:/Data Analyst/Data Analyst Software/Rstudio_Directory/Dataset/Fitabase Data 4.12.16-5.12.16/dailyCalories_merged.csv")
+intensities <- read.csv("D:/Data Analyst/Data Analyst Software/Rstudio_Directory/Dataset/Fitabase Data 4.12.16-5.12.16/dailyIntensities_merged.csv")
+steps <- read.csv("D:/Data Analyst/Data Analyst Software/Rstudio_Directory/Dataset/Fitabase Data 4.12.16-5.12.16/dailySteps_merged.csv")
+sleeps <- read.csv("D:/Data Analyst/Data Analyst Software/Rstudio_Directory/Dataset/Fitabase Data 4.12.16-5.12.16/sleepDay_merged.csv")
+hourly_steps <- read.csv("D:/Data Analyst/Data Analyst Software/Rstudio_Directory/Dataset/Fitabase Data 4.12.16-5.12.16/hourlySteps_merged.csv")
+weight_info <- read.csv("D:/Data Analyst/Data Analyst Software/Rstudio_Directory/Dataset/Fitabase Data 4.12.16-5.12.16/weightLogInfo_merged.csv")
+
+```
+
+```{r Check Datasets}
+# Check dataset samples
+
+head(activity)
+head(calories)
+head(intensities)
+head(steps)
+head(sleeps)
+head(weight_info)
+head(hourly_steps)
+
+```
+
+## **Cleaning the Data**
+
+```{r Check number of participants}
+# Check number of participants
+
+n_distinct(activity$Id)
+n_distinct(calories$Id)
+n_distinct(intensities$Id)
+n_distinct(steps$Id)
+n_distinct(sleeps$Id)
+n_distinct(weight_info$Id)
+
+```
+
+```{r Check for duplicates & na}
+# Check for duplicates & na
+
+sum(duplicated(activity))
+sum(is.na(activity))
+sum(duplicated(calories))
+sum(is.na(calories))
+sum(duplicated(intensities))
+sum(is.na(intensities))
+sum(duplicated(sleeps))
+sum(is.na(sleeps))
+sum(duplicated(steps))
+sum(is.na(steps))
+
+```
+
+Duplicates were found but there were no NA's so only duplicates will be removed.
+
+```{r Remove duplicates}
+# Remove duplicates
+
+sleeps <- sleeps %>% 
+  distinct()
+
+# Check to make sure duplicates were removed
+
+sum(duplicated(sleep)) 
+
+```
+
+
+I want to merge my daily activity and sleep datasets in the future but noticed their date formats did not match. I will be changing them to a month/day/year format and renaming both columns in their respective columns to "Date" to make merging easier.
+
+
+```{r Change Date format}
+# Change Date format on activity and sleeps dataset
+
+activity_v2 <- activity %>% 
+  mutate(ActivityDate = mdy(ActivityDate)) %>% 
+  rename(Date = ActivityDate)
+sleeps_v2 <- sleeps %>% 
+  mutate(SleepDay = mdy_hms(SleepDay)) %>% 
+  rename(Date = SleepDay)
+```
+
+#### **Adding Column**
+* Adding **"Day"** column to the activity dataset so that it will be easier to see the days instead of dates. 
+* Adding **"Activeness"** column to the activity dataset to grouping the activeness levels. The activeness levels were determined based on <https://www.medicinenet.com/how_many_steps_a_day_is_considered_active/article.htm>.
+* Adding **"Sleepiness"** column to the sleep dataset to classify sleep time.
+
+```{r Adding Columns}
+# Adding Day column
+activity_v3 <- activity_v2 %>%
+  mutate(Day = weekdays(as.Date(Date)))
+
+# Adding Activeness column
+activity_v4 <- activity_v3 %>%
+  mutate(Activeness = case_when(.$TotalSteps < 5000 ~ "Sedentary",
+                                .$TotalSteps < 7499 ~ "Low Active",
+                                .$TotalSteps < 9999 ~ "Somewhat Active",
+                                .$TotalSteps < 12500 ~ "Active",
+                                .$TotalSteps >= 12500 ~ "Highly Active"))
+
+# Adding Sleep column
+sleeps_v3 <- sleeps_v2 %>%
+  mutate(Sleepiness = case_when(.$TotalMinutesAsleep < 420 ~ "Need More Sleep",
+                                .$TotalMinutesAsleep >= 420 & TotalMinutesAsleep < 540 ~ "Good Sleep",
+                                .$TotalMinutesAsleep >= 540 ~ "Too Much Sleep"))
+
+
+
+```
+
+#### **Changing Time Format **
+I want to change hourly_steps dataset ActivityHour column from string/character into date. And then separate it into date and time.
+
+```{r Change Time Format}
+
+# Change date format in ActivityHour Column
+hourly_steps<- hourly_steps %>% 
+  mutate(ActivityHour = as.POSIXct(ActivityHour,format ="%m/%d/%Y %I:%M:%S %p" , tz=Sys.timezone()))
+
+# Separate date & time in ActivityHour Column
+hourly_steps <- hourly_steps %>%
+  separate(ActivityHour, into = c("date", "time"), sep= " ") %>%
+  mutate(date = ymd(date)) 
+
+head(hourly_steps)
+```
+
+#### **Merging Datasets**
+Merging the Activity and sleeps dataset to identify trends between the two in the analyze phase
+
+
+```{r Merging datasets}
+# Merging the Activity and sleeps dataset
+activity_sleep <- merge(activity_v4, sleeps_v2, by=c("Id", "Date"))
+```
+
+#### **Data Cleaning Summary**
+* Removes duplicate from sleep dataset
+* Change Date format on activity and sleeps dataset
+* Adding **"Day"** column to the activity dataset
+* Adding **"Activeness"** column to the activity dataset
+* Adding **"Sleepiness"** column to the sleep dataset
+* Change Date format on hourly_steps dataset
+* Merging Activity and Sleeps dataset
+
+## **Analyze the Data**
+
+```{r Total Steps vs Calories Burn}
+ggplot(activity, mapping = aes(x = Calories, y = TotalSteps, color = Calories)) +
+  geom_point() +
+  geom_smooth(method = "loess") +
+  labs(title = "Total Steps vs Calories Burn", x = "Calories Burn") +
+  scale_color_gradient(low = "#501e7d", high = "#fd8f76")
+```
+
+<br>
+
+From this graph we can see that there is a positive correlation between calories and total steps. The more steps taken, the more calories are burned.
+
+<br>
+
+```{r Count of Activity Levels}
+# Summary Percentage Activeness
+activity_v4 %>% 
+  group_by(Activeness) %>% 
+  summarise (total_active = n()) %>% 
+  mutate (totals_active = sum(total_active)) %>% 
+  group_by(Activeness) %>% 
+  summarise (TotalPercent_active = total_active / totals_active*100)
+
+#Sort Activeness levels
+activity_v4$Activeness <- factor(activity_v4$Activeness, levels = c("Sedentary", "Low Active", "Somewhat Active", "Active", "Highly Active"))
+
+# Data Visualization
+ggplot(data=activity_v4)+geom_bar(mapping=aes(x=Activeness, fill=Activeness)) +
+   labs(title = "Count of Activity Levels",
+       y = "Number of Days")
+```
+
+<br>
+
+The number of Sedentary days are much higher than all the others. In addition, Low Active and Somewhat Active Days also have higher counts than Active and Highly Active, showing that most users are not active.
+
+<br>
+
+```{r Total Steps per Day}
+
+#Sort Day levels
+activity_v4$Day <- factor(activity_v4$Day, levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"))
+
+#Data Visualization
+ggplot(data=activity_v4, aes(x=Day, y=TotalSteps, fill = Day)) + 
+  geom_bar(stat='identity') + 
+  labs(title= "Total Steps Per Day")
+```
+
+<br>
+
+From the graph bar above we can see that Tuesday, Wednesday, and Thursday are the most active days for users. And the least active day for user is on Sundays.
+
+<br>
+
+```{r Average Total Steps vs Time}
+hourly_steps %>%
+group_by(time) %>%
+summarize(average_steps=mean(StepTotal)) %>%
+ggplot()+
+geom_col(mapping=aes(x=time, y=average_steps, fill=average_steps)) +
+labs(title="Hourly steps Throughout the day", y = "Average Steps") +
+scale_fill_gradient(low="#501e7d", high="#fd8f76") +
+theme(axis.text.x= element_text(angle=90))
+```
+
+<br>
+
+From the histogram, we can see that the average step of the participants is relatively high in the morning at 9 A.M. This is usually the time people start work, and they are likely to travel on foot. Then it rises again at 12 P.M. - 1 P.M. where the hours are work breaks. The average daily step peaks at 5 P.M. - 7 P.M. This is the time when people finish work, and it seems several participants are exercising during this period (ex. walk, run, gym session).
+
+<br>
+
+```{r Total Minutes Asleep vs Calories Burn}
+ggplot(activity_sleep, mapping = aes(x = Calories, y = TotalMinutesAsleep, color = Calories)) +
+  geom_point() +
+  geom_smooth(method = "loess") +
+  labs(title = "Total Minutes Asleep vs Calories Burn", x = "Calories Burn") +
+  scale_color_gradient(low = "#501e7d", high = "#fd8f76")
+```
+
+<br>
+
+While there wasn't a correlation line, we can still see that the points plotted for those who got sufficient sleep ended up having higher numbers of calories burned compared to those outside of the recommended sleep range. While more information is needed, this is mostly likely due to those people being more active.
+
+<br>
+
+```{r}
+# Check for the number of rows / observations
+str(sleeps_v3)
+
+# How many participant ID use fitbit sleeping feature
+sleeps_v3 %>% 
+  summarise(count = n_distinct(Id))
+```
+From the sleeps dataset, there are total of 410 observations with 24 user IDs using sleep track on FitBit, although there should be a total of 900 observations  with 30 user IDs, if all participants use FitBit while sleeping for a month. It can be concluded that not all participants use their FitBit gadgets regularly while sleeping.
+
+
+```{r Ideal Sleeping Time}
+
+#Sort Sleepiness levels
+sleeps_v3$Sleepiness <- factor(sleeps_v3$Sleepiness, levels = c("Need More Sleep", "Good Sleep", "Too Much Sleep"))
+
+#Summary Percent Participant, and Visualize it
+sleeps_v3 %>% 
+  group_by(Sleepiness) %>% 
+  summarise (total = n()) %>% 
+  mutate (totals = sum(total)) %>% 
+  group_by(Sleepiness) %>% 
+  summarise (TotalPercent = total / totals*100) %>%
+  ggplot(aes(x=Sleepiness, y=TotalPercent, fill = Sleepiness)) + 
+  geom_bar(stat='identity') + 
+  geom_text(aes(label=round(TotalPercent, digits = 0)), vjust=-0.3, size=3.5) +
+  labs(title= "Participants Ideal Sleeping Time", y= "Percentages (%)")
+
+
+
+```
+
+<br>
+
+According to the CDC, an average adult must get a 7-9 hour sleep everyday. Based on the data, only about 46% of the people get good sleep. And the other 54% participants either need more sleep or had too much sleep.
+
+<br>
+
+## **Key Findings & Act Phase**
+
+<br>
+
+#### **Key Findings**
+This data provided valuable insights that can be used to develop a marketing strategy around the Bellabeat App. Below are some of those insights:
+
+* There is a positive correlation between calories and total steps. The more steps taken, the more calories are burned.
+
+* The majority of users do not take enough steps to be considered active
+
+* Tuesday, Wednesday, and Thursday are the most active days for users. With average daily step peaks at 5 P.M. - 7 P.M.
+
+* Most all participants use their FitBit gadgets regularly while sleeping.
+
+* Only 46% of users have good sleeps time (7-9 hour of sleep). And the other 54% participants either need more sleep or had too much sleep.
+
+<br>
+
+#### **Act**
+My marketing strategy recommendations for the Bellabeat app:
+
+* There is no mention of Calorie Intake. Without calorie intake, we cannot determine whether the calories burned are sufficient or excessive. In addition to providing manual calories input, Bellabeat can provide food or drink options along with the average calories contained in it, making it easier for users to use this feature.
+
+* Since Bellabeat is geared towards health, they could try implementing daily and long-term goals for users. This includes things such as setting a daily step goal for users because most of them walked under the recommended daily number of steps.
+
+* Most users are only active on certain days and times. They can implement features that monitor our daily activities, so that users can managed their free time for exercise each days.
+
+* Because several users don't use/always use their wearable gadgets while sleeping, they can make wearable devices that are more comfortable to wear while sleeping. So that more users can use the sleep feature on their wearable devices to track their sleeps.
+
+* We found out that only 46% users have a good sleep i.e 7-9 hours. A good sleep is very beneficial for our health, so what we can do is have notifications to remind users that it is time to go to bed. A built in alarm would also help the user wake up at the right time and avoid oversleeping.
+
+
+
+
+
+
+
+
+
+
